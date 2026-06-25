@@ -23,6 +23,6 @@ if (process.env.NODE_ENV === 'development') {
 
 export async function getCollection() {
   const connectedClient = await clientPromise;
-  // Database: 'novel', Collection: 'list'
-  return connectedClient.db('novel').collection('list');
+  // Database: 'omni', Collection: 'repository'
+  return connectedClient.db('omni').collection('repository');
 }
