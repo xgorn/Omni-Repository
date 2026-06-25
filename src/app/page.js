@@ -17,7 +17,8 @@ export default function ReadingList() {
   const [chapter, setChapter] = useState('0');
   
   // Search, Selection, and Filtering States
-  const [media, setBooks] = useState([]);
+  const [media, setMedia] = useState([]);         // Active, filtered view list
+  const [allStats, setAllStats] = useState([]);   // 👈 NEW: Unfiltered database baseline for stable metrics
   const [search, setSearch] = useState('');
   const [selectedTab, setSelectedTab] = useState('all'); 
   const [message, setMessage] = useState({ text: '', isError: false });
@@ -30,24 +31,39 @@ export default function ReadingList() {
   const [currentEditAltInput, setCurrentEditAltInput] = useState('');
   const [editChapter, setEditChapter] = useState('0');
 
-  // Load data publicly with reactive filters
-  const fetchBooks = async (searchQuery = '', typeQuery = selectedTab) => {
+  // Load stable inventory metrics (Always fetches everything)
+  const fetchGlobalMetrics = async () => {
+    try {
+      const res = await fetch('/api/media?type=all'); // Bypasses tab filters completely
+      const data = await res.json();
+      if (res.ok) setAllStats(data);
+    } catch (err) {
+      console.error("Failed to sync inventory stats", err);
+    }
+  };
+
+  // Load data for the active library viewport feed
+  const fetchMedia = async (searchQuery = '', typeQuery = selectedTab) => {
     try {
       const url = `/api/media?search=${encodeURIComponent(searchQuery)}&type=${typeQuery}`;
       const res = await fetch(url);
       const data = await res.json();
-      if (res.ok) setBooks(data);
+      if (res.ok) setMedia(data);
     } catch (err) {
       console.error("Failed to fetch media", err);
     }
   };
 
+  // Run on first load and whenever tabs or search queries change
   useEffect(() => {
-    fetchBooks(search, selectedTab);
+    fetchMedia(search, selectedTab);
   }, [search, selectedTab]);
 
+  // Sync metrics baseline on initial mount
   useEffect(() => {
-    const savedKey = localStorage.getItem('Omni_session_key');
+    fetchGlobalMetrics();
+    
+    const savedKey = localStorage.getItem('omni_session_key');
     if (savedKey) {
       setActiveToken(savedKey);
       setIsLoggedIn(true);
@@ -65,11 +81,11 @@ export default function ReadingList() {
       });
       
       if (res.ok) {
-        localStorage.setItem('Omni_session_key', loginInput);
+        localStorage.setItem('omni_session_key', loginInput);
         setActiveToken(loginInput);
         setIsLoggedIn(true);
         setLoginInput('');
-        fetchBooks(search, selectedTab); 
+        fetchMedia(search, selectedTab); 
       } else {
         setLoginError('❌ Access Denied: Invalid Master API Key.');
       }
@@ -79,7 +95,7 @@ export default function ReadingList() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('Omni_session_key');
+    localStorage.removeItem('omni_session_key');
     setActiveToken('');
     setIsLoggedIn(false);
     cancelEditing();
@@ -131,7 +147,10 @@ export default function ReadingList() {
       setAltTitlesArray([]);
       setCurrentAltInput('');
       setChapter('0');
-      fetchBooks(search, selectedTab); 
+      
+      // Refresh both the view and the stats panel metrics
+      fetchMedia(search, selectedTab); 
+      fetchGlobalMetrics();
     } catch (err) {
       setMessage({ text: err.message, isError: true });
     }
@@ -149,7 +168,10 @@ export default function ReadingList() {
         },
         body: JSON.stringify({ original_title: bookTitle, last_read_chapter: nextChapter })
       });
-      if (res.ok) fetchBooks(search, selectedTab);
+      if (res.ok) {
+        fetchMedia(search, selectedTab);
+        fetchGlobalMetrics(); // Keeps counts perfectly accurate
+      }
     } catch (err) {
       console.error(err);
     }
@@ -191,7 +213,8 @@ export default function ReadingList() {
 
       if (res.ok) {
         cancelEditing();
-        fetchBooks(search, selectedTab); 
+        fetchMedia(search, selectedTab); 
+        fetchGlobalMetrics();
       } else {
         const data = await res.json();
         alert(`Failed to update: ${data.error}`);
@@ -212,8 +235,8 @@ export default function ReadingList() {
     }
   };
 
-  // Compute dynamic type breakdowns from current list state array
-  const countByType = (typeKey) => media.filter(b => b.type?.toLowerCase() === typeKey.toLowerCase()).length;
+  // 💡 FIXED ENGINE: Calculates totals using the complete allStats array instead of filtered media array
+  const countByType = (typeKey) => allStats.filter(b => b.type?.toLowerCase() === typeKey.toLowerCase()).length;
 
   return (
     <div style={{ backgroundColor: '#0B132B', minHeight: '100vh', width: '100%', color: '#F4F5F6', fontFamily: 'system-ui, -apple-system, sans-serif', padding: '40px 16px', boxSizing: 'border-box' }}>
@@ -222,13 +245,14 @@ export default function ReadingList() {
         {/* TOOLBAR HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* 🎨 CUSTOM Omni Repository LOGO SVG ICON */}
+            
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="40" height="40" style={{ flexShrink: 0 }}>
               <rect width="32" height="32" rx="8" fill="#1C2541" />
               <circle cx="16" cy="15" r="10" fill="none" stroke="#3A506B" strokeWidth="1.5" strokeDasharray="3 1"/>
               <path d="M7 22C11 22 13 20 16 18C19 20 21 22 25 22V10C21 10 19 12 16 14C13 12 11 10 7 10V22Z" fill="#0B132B" stroke="#5BC0BE" strokeWidth="2" strokeLinejoin="round"/>
               <polygon points="16,11 17.5,14 20.5,14.5 18,16.5 19,19.5 16,18 13,19.5 14,16.5 11.5,14.5 14.5,14" fill="#FFFFFF"/>
             </svg>
+
             <div>
               <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '800', letterSpacing: '-0.5px', color: '#FFFFFF' }}>Omni Repository</h1>
               <p style={{ margin: '4px 0 0 0', color: '#64748B', fontSize: '13px' }}>Multi-Media Progress Registry Engine</p>
@@ -312,7 +336,6 @@ export default function ReadingList() {
                   COLLECTION INVENTORY METRICS
                 </h3>
                 
-                {/* Grid Layout containing dynamic metrics counts */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '14px' }}>
                   <div style={{ backgroundColor: '#0B132B', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: '#34D399' }}>📚 NOVELS</div>
@@ -336,7 +359,7 @@ export default function ReadingList() {
                   </div>
                   <div style={{ backgroundColor: '#0B132B', padding: '10px 14px', borderRadius: '8px', border: '1px solid #3A506B' }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: '#5BC0BE' }}>🌐 TOTAL</div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', marginTop: '4px', color: '#FFF' }}>{media.length}</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', marginTop: '4px', color: '#FFF' }}>{allStats.length}</div>
                   </div>
                 </div>
               </section>
@@ -354,12 +377,46 @@ export default function ReadingList() {
           </div>
 
           {/* MASTER TAB NAVIGATION SYSTEM */}
-          <nav style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', borderBottom: '2px solid #1C2541', paddingBottom: '12px' }}>
+          <nav style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(6, 1fr)', 
+            gap: '10px', 
+            borderBottom: '2px solid #1C2541', 
+            paddingBottom: '12px', 
+            boxSizing: 'border-box',
+            width: '100%',
+            maxWidth: '100%'
+          }}>
             {['all', 'novel', 'manga', 'manhwa', 'manhua', 'anime'].map((tab) => {
               const active = selectedTab === tab;
               return (
-                <button key={tab} onClick={() => setSelectedTab(tab)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', textTransform: 'uppercase', fontSize: '12px', fontWeight: '700', cursor: 'pointer', backgroundColor: active ? '#5BC0BE' : '#1C2541', color: active ? '#0B132B' : '#94A3B8', transition: 'all 0.2s' }}>
-                  {tab === 'all' ? '🌐 View All' : tab}
+                <button 
+                  key={tab} 
+                  onClick={() => setSelectedTab(tab)} 
+                  style={{ 
+                    boxSizing: 'border-box',
+                    width: '100%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '44px',
+                    padding: '0 4px',
+                    margin: '0',
+                    borderRadius: '8px', 
+                    border: 'none', 
+                    textTransform: 'uppercase', 
+                    fontSize: '12px', 
+                    fontWeight: '700', 
+                    cursor: 'pointer', 
+                    backgroundColor: active ? '#5BC0BE' : '#1C2541', 
+                    color: active ? '#0B132B' : '#94A3B8', 
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {tab === 'all' ? '🌐 All' : tab}
                 </button>
               );
             })}
