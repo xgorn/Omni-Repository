@@ -338,7 +338,7 @@ export default function ReadingList() {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '14px' }}>
                   <div style={{ backgroundColor: '#0B132B', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#34D399' }}>📚 NOVELS</div>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#34D399' }}>📚 NOVEL</div>
                     <div style={{ fontSize: '20px', fontWeight: '800', marginTop: '4px', color: '#FFF' }}>{countByType('novel')}</div>
                   </div>
                   <div style={{ backgroundColor: '#0B132B', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
