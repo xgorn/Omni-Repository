@@ -1,7 +1,6 @@
 export const metadata = {
   title: 'Omni Repository - Multi-Media Progress Archive',
-  description: 'Track my favorite novel/anime/manga/manhwa/manhua and reading progress seamlessly.',
-  icon: '/favicon.svg'
+  description: 'Track my favorite novel/anime/manga/manhwa/manhua and reading progress seamlessly.'
 };
 
 export default function RootLayout({ children }) {
